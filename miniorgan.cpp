@@ -210,15 +210,6 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 {
 	unsigned nResult = nChunkSize;
 
-	/*
-	// reset sample counter if key has changed
-	if (m_nFrequency != m_nPrevFrequency)
-	{
-		m_nSampleCount = 0;
-		m_nPrevFrequency = m_nFrequency;
-	}
-	*/
-
 	u32 *leftSample = pBuffer;
 	u32 *rightSample = pBuffer+1;
 

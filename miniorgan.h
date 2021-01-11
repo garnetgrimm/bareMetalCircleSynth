@@ -32,7 +32,7 @@
 	#define SAMPLE_RATE	48000
 #endif
 
-#define VOICES 3
+#define VOICES 4
 
 #include <circle/interrupt.h>
 #include <circle/usb/usbmidi.h>
