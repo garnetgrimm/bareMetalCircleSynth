@@ -22,6 +22,8 @@
 #include <circle/logger.h>
 #include <assert.h>
 
+#include "wavetable.h"
+
 #define VOLUME_PERCENT	20
 
 #define MIDI_NOTE_OFF	0b1000
@@ -31,7 +33,12 @@
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
+#define TABLE_RESOLUTION 0x10000
+
 static const char FromMiniOrgan[] = "organ";
+
+WaveTable* tables;
+float dt = ((float)1/(float)SAMPLE_RATE);
 
 // See: http://www.deimos.ca/notefreqs/
 const float CMiniOrgan::s_KeyFrequency[/* MIDI key number */] =
@@ -85,6 +92,11 @@ CMiniOrgan::CMiniOrgan (CInterruptSystem *pInterrupt)
 	m_nHighLevel    = GetRangeMax () * VOLUME_PERCENT / 100;
 	m_nNullLevel    = (m_nHighLevel + m_nLowLevel) / 2;
 	m_nCurrentLevel = m_nNullLevel;
+	
+	tables = new WaveTable[3];
+	tables[0] = SinTable(TABLE_RESOLUTION, m_nHighLevel - m_nLowLevel);
+	tables[1] = SawTable(TABLE_RESOLUTION, m_nHighLevel - m_nLowLevel);
+	tables[2] = PulseTable(TABLE_RESOLUTION, m_nHighLevel - m_nLowLevel);
 	
 	for(int i = 0; i < VOICES; i++) {
 		m_nFrequency[i] = 0;
@@ -222,17 +234,9 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 		for(int voice = 0; voice < VOICES; voice++) {
 			if (m_nFrequency[voice] != 0)			// key pressed?
 			{
-				// output level has to be changed on every nSampleDelay'th sample (if key is pressed)
-				unsigned nSampleDelay = (SAMPLE_RATE/2 + m_nFrequency[voice]/2) / m_nFrequency[voice];
-				// change output level if required to generate a square wave
-				if ((m_nSampleCount+sampleOffset) % nSampleDelay > (nSampleDelay/2))
-				{
-					m_nPulseState[voice] = m_nHighLevel;
-				} else {
-					m_nPulseState[voice] = m_nLowLevel;
-				}
-				
-				m_nCurrentLevel = m_nPulseState[voice] / VOICES;
+				float currentTime = (m_nSampleCount+sampleOffset)*dt;
+				int sampleIdx = (int)((float)TABLE_RESOLUTION*m_nFrequency[voice]*currentTime);
+				m_nCurrentLevel = tables[0].valueAt(sampleIdx) / VOICES;
 				*leftSample += (u32) m_nCurrentLevel;		// 2 stereo channels
 				*rightSample += (u32) m_nCurrentLevel;
 			}
@@ -303,6 +307,7 @@ void CMiniOrgan::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned 
 		u8 ucKeyCode = RawKeys[i];
 		if (ucKeyCode != 0)
 		{
+			
 			if (0x04 <= ucKeyCode && ucKeyCode <= 0x1D)
 			{
 				chKey[keysPressed++] = RawKeys[i]-0x04+'A';	// key code of 'A' is 0x04
