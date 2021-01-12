@@ -33,7 +33,7 @@
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
-#define TABLE_RESOLUTION 0x10000
+#define TABLE_RESOLUTION 0x100000
 
 static const char FromMiniOrgan[] = "organ";
 
@@ -220,7 +220,21 @@ void CMiniOrgan::Process (boolean bPlugAndPlayUpdated)
 
 unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 {
+	
 	unsigned nResult = nChunkSize;
+	
+	boolean voicesOn = false;
+	for(int voice = 0; voice < VOICES; voice++) {
+		if(m_nFrequency[voice] != 0) {
+			voicesOn = true;
+			break;
+		}
+	}
+	//if all voices are off
+	if(!voicesOn) {
+		//reset sampleCount
+		m_nSampleCount = 0;
+	}
 
 	u32 *leftSample = pBuffer;
 	u32 *rightSample = pBuffer+1;
