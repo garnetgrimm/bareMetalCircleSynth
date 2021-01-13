@@ -29,6 +29,7 @@
 
 #define MIDI_NOTE_OFF	0b1000
 #define MIDI_NOTE_ON	0b1001
+#define CONTROL_CHANGE  0b1011
 
 #define KEY_NONE	255
 
@@ -103,6 +104,13 @@ CMiniOrgan::CMiniOrgan (CInterruptSystem *pInterrupt)
 		m_nFrequency[i] = 0;
 		m_nVelocity[i] = 0;
 		m_nPhase[i] = 0;
+	}
+	
+	m_nOscType[0] = 0;
+	m_nOscMod[0] = 1;
+	for(int i = 1; i < OSCILLATORS; i++) {
+		m_nOscType[i] = 0;
+		m_nOscMod[i] = 5;
 	}
 	
 	//bandpass filter with peak at middle of keyboard
@@ -258,9 +266,12 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 				if(sampleIdx % TABLE_RESOLUTION == 0) {
 					m_nPhase[voice] = 0;
 				}
-				u32 m_nCurrentLevel = tables[0].valueAt(sampleIdx) / VOICES;
-				*leftSample += m_nCurrentLevel;		// 2 stereo channels
-				*rightSample += m_nCurrentLevel;
+				for(int osc = 0; osc < OSCILLATORS; osc++) {
+						WaveTable table = tables[m_nOscType[osc]];
+						u32 m_nCurrentLevel = table.valueAt(sampleIdx*m_nOscMod[osc]) / (VOICES*OSCILLATORS);
+						*leftSample += m_nCurrentLevel;		// 2 stereo channels
+						*rightSample += m_nCurrentLevel;
+				}
 			}
 		}
 		leftSample+=2;

@@ -32,7 +32,8 @@
 	#define SAMPLE_RATE	48000
 #endif
 
-#define VOICES 4
+#define VOICES 6
+#define OSCILLATORS 2
 
 #include <circle/interrupt.h>
 #include <circle/usb/usbmidi.h>
@@ -81,6 +82,9 @@ private:
 	unsigned m_nFrequency[VOICES];		// 0 if no key pressed
 	unsigned m_nVelocity[VOICES];		
 	unsigned m_nPhase[VOICES];
+	
+	unsigned m_nOscType[OSCILLATORS];
+	unsigned m_nOscMod[OSCILLATORS];
 
 	static const float s_KeyFrequency[];
 	static const TNoteInfo s_Keys[];
