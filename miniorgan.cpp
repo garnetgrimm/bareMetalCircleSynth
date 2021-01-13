@@ -23,6 +23,7 @@
 #include <assert.h>
 
 #include "wavetable.h"
+#include "iirfilter.h"
 
 #define VOLUME_PERCENT	20
 
@@ -38,6 +39,7 @@
 static const char FromMiniOrgan[] = "organ";
 
 WaveTable* tables;
+IIRFilter filter;
 float dt = ((float)1/(float)SAMPLE_RATE);
 
 // See: http://www.deimos.ca/notefreqs/
@@ -103,6 +105,9 @@ CMiniOrgan::CMiniOrgan (CInterruptSystem *pInterrupt)
 		m_ucKeyNumber[i] = KEY_NONE;
 		m_nPulseState[i] = m_nNullLevel;
 	}
+	
+	//bandpass filter with peak at middle of keyboard
+	filter.generateBandPass(SAMPLE_RATE, s_KeyFrequency[66], 100);
 }
 
 CMiniOrgan::~CMiniOrgan (void)
@@ -258,13 +263,15 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 		leftSample+=2;
 		rightSample+=2;
 	}
+	
+	//filter.processSamples(pBuffer, nChunkSize);
+	
 	m_nSampleCount += nChunkSize/2;
 	return nResult;
 }
 
 void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLength)
 {
-	/*
 	assert (s_pThis != 0);
 
 	// The packet contents are just normal MIDI data - see
@@ -281,32 +288,23 @@ void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLeng
 	u8 ucKeyNumber = pPacket[1];
 	u8 ucVelocity  = pPacket[2];
 
-	if (ucType == MIDI_NOTE_ON)
-	{
-		if (   ucVelocity > 0
-		    && ucKeyNumber < sizeof s_KeyFrequency / sizeof s_KeyFrequency[0])
-		{
-			s_pThis->m_ucKeyNumber = ucKeyNumber;
-			s_pThis->m_nFrequency[0] = (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5);
+	if (ucType == MIDI_NOTE_ON) {
+		if (ucVelocity > 0 && ucKeyNumber < sizeof s_KeyFrequency / sizeof s_KeyFrequency[0]) {
+			for(int currVoice = 0; currVoice < VOICES; currVoice++) {
+				if(s_pThis->m_nFrequency[currVoice] == 0) {
+					s_pThis->m_nFrequency[currVoice] = (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5);
+					break;
+				}
+			}
 		}
-		else
-		{
-			if (s_pThis->m_ucKeyNumber == ucKeyNumber)
-			{
-				s_pThis->m_ucKeyNumber = KEY_NONE;
-				s_pThis->m_nFrequency[0] = 0;
+	} else if (ucType == MIDI_NOTE_OFF) {
+		for(int currVoice = 0; currVoice < VOICES; currVoice++) {
+			if(s_pThis->m_nFrequency[currVoice] == (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5)) {
+				s_pThis->m_nFrequency[currVoice] = 0;
+				break;
 			}
 		}
 	}
-	else if (ucType == MIDI_NOTE_OFF)
-	{
-		if (s_pThis->m_ucKeyNumber == ucKeyNumber)
-		{
-			s_pThis->m_ucKeyNumber = KEY_NONE;
-			s_pThis->m_nFrequency[0] = 0;
-		}
-	}
-	*/
 }
 
 void CMiniOrgan::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6])
