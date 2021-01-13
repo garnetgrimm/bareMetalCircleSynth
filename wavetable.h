@@ -53,4 +53,16 @@ public:
 	}
 };
 
+class VelocityTable: public WaveTable {
+	public:
+		VelocityTable(float steepness): WaveTable(128) {
+			float coeff = pow(10, -(2 + 4*(steepness-1))); 
+			for(int i = 0; i < 128; i++) {
+				float y = coeff * pow((float)i/128, 2 * steepness);
+				if(y > 1) y = 1;
+				this->values[i] = (int)y*100;
+			}
+		}
+};
+
 #endif

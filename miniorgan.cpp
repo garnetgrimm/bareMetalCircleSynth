@@ -40,6 +40,7 @@
 static const char FromMiniOrgan[] = "organ";
 
 WaveTable* tables;
+VelocityTable velocityTable(0.3);
 IIRFilter filter;
 float dt = ((float)1/(float)SAMPLE_RATE);
 
@@ -262,13 +263,14 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 			{
 				unsigned phase = ++m_nPhase[voice];
 				float currentTime = phase*dt;
+				float velocity = ((float)velocityTable.valueAt(m_nVelocity[voice]))/100;
 				int sampleIdx = (int)((float)TABLE_RESOLUTION*m_nFrequency[voice]*currentTime);
 				if(sampleIdx % TABLE_RESOLUTION == 0) {
 					m_nPhase[voice] = 0;
 				}
 				for(int osc = 0; osc < OSCILLATORS; osc++) {
 						WaveTable table = tables[m_nOscType[osc]];
-						u32 m_nCurrentLevel = table.valueAt(sampleIdx*m_nOscMod[osc]) / (VOICES*OSCILLATORS);
+						u32 m_nCurrentLevel = (velocity*table.valueAt(sampleIdx*m_nOscMod[osc])) / (VOICES*OSCILLATORS);
 						*leftSample += m_nCurrentLevel;		// 2 stereo channels
 						*rightSample += m_nCurrentLevel;
 				}
@@ -307,6 +309,7 @@ void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLeng
 				if(s_pThis->m_nFrequency[currVoice] == 0) {
 					s_pThis->m_nFrequency[currVoice] = (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5);
 					s_pThis->m_nPhase[currVoice] = 0;
+					s_pThis->m_nVelocity[currVoice] = ucVelocity;
 					break;
 				}
 			}
@@ -316,6 +319,7 @@ void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLeng
 			if(s_pThis->m_nFrequency[currVoice] == (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5)) {
 				s_pThis->m_nFrequency[currVoice] = 0;
 				s_pThis->m_nPhase[currVoice] = 0;
+				s_pThis->m_nVelocity[currVoice] = 0;
 				break;
 			}
 		}
