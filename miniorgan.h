@@ -77,12 +77,10 @@ private:
 	int      m_nLowLevel;
 	int      m_nNullLevel;
 	int      m_nHighLevel;
-	int      m_nCurrentLevel;
 	unsigned m_nSampleCount;
-	unsigned m_nPrevFrequency[VOICES];
 	unsigned m_nFrequency[VOICES];		// 0 if no key pressed
-	int m_nPulseState[VOICES];
-	u8 m_ucKeyNumber[VOICES];
+	unsigned m_nVelocity[VOICES];		
+	unsigned m_nPhase[VOICES];
 
 	static const float s_KeyFrequency[];
 	static const TNoteInfo s_Keys[];

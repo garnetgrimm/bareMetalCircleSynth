@@ -93,7 +93,6 @@ CMiniOrgan::CMiniOrgan (CInterruptSystem *pInterrupt)
 	m_nLowLevel     = GetRangeMin () * VOLUME_PERCENT / 100;
 	m_nHighLevel    = GetRangeMax () * VOLUME_PERCENT / 100;
 	m_nNullLevel    = (m_nHighLevel + m_nLowLevel) / 2;
-	m_nCurrentLevel = m_nNullLevel;
 	
 	tables = new WaveTable[3];
 	tables[0] = SinTable(TABLE_RESOLUTION, m_nHighLevel - m_nLowLevel);
@@ -102,8 +101,8 @@ CMiniOrgan::CMiniOrgan (CInterruptSystem *pInterrupt)
 	
 	for(int i = 0; i < VOICES; i++) {
 		m_nFrequency[i] = 0;
-		m_ucKeyNumber[i] = KEY_NONE;
-		m_nPulseState[i] = m_nNullLevel;
+		m_nVelocity[i] = 0;
+		m_nPhase[i] = 0;
 	}
 	
 	//bandpass filter with peak at middle of keyboard
@@ -253,11 +252,15 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 		for(int voice = 0; voice < VOICES; voice++) {
 			if (m_nFrequency[voice] != 0)			// key pressed?
 			{
-				float currentTime = (m_nSampleCount+sampleOffset)*dt;
+				unsigned phase = ++m_nPhase[voice];
+				float currentTime = phase*dt;
 				int sampleIdx = (int)((float)TABLE_RESOLUTION*m_nFrequency[voice]*currentTime);
-				m_nCurrentLevel = tables[0].valueAt(sampleIdx) / VOICES;
-				*leftSample += (u32) m_nCurrentLevel;		// 2 stereo channels
-				*rightSample += (u32) m_nCurrentLevel;
+				if(sampleIdx % TABLE_RESOLUTION == 0) {
+					m_nPhase[voice] = 0;
+				}
+				u32 m_nCurrentLevel = tables[0].valueAt(sampleIdx) / VOICES;
+				*leftSample += m_nCurrentLevel;		// 2 stereo channels
+				*rightSample += m_nCurrentLevel;
 			}
 		}
 		leftSample+=2;
@@ -266,7 +269,6 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 	
 	//filter.processSamples(pBuffer, nChunkSize);
 	
-	m_nSampleCount += nChunkSize/2;
 	return nResult;
 }
 
@@ -293,6 +295,7 @@ void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLeng
 			for(int currVoice = 0; currVoice < VOICES; currVoice++) {
 				if(s_pThis->m_nFrequency[currVoice] == 0) {
 					s_pThis->m_nFrequency[currVoice] = (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5);
+					s_pThis->m_nPhase[currVoice] = 0;
 					break;
 				}
 			}
@@ -301,6 +304,7 @@ void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLeng
 		for(int currVoice = 0; currVoice < VOICES; currVoice++) {
 			if(s_pThis->m_nFrequency[currVoice] == (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5)) {
 				s_pThis->m_nFrequency[currVoice] = 0;
+				s_pThis->m_nPhase[currVoice] = 0;
 				break;
 			}
 		}
@@ -340,11 +344,13 @@ void CMiniOrgan::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned 
 			{
 				u8 ucKeyNumber = s_Keys[i].KeyNumber;
 				s_pThis->m_nFrequency[currVoice] = (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5);
+				s_pThis->m_nPhase[currVoice] = 0;
 			}
 		}
 	}
 	for(int currVoice = lastNote; currVoice < VOICES; currVoice++) {
 		s_pThis->m_nFrequency[currVoice] = 0;
+		s_pThis->m_nPhase[currVoice] = 0;
 	}
 }
 
