@@ -27,9 +27,9 @@
 
 #define VOLUME_PERCENT	20
 
-#define MIDI_NOTE_OFF	0b1000
-#define MIDI_NOTE_ON	0b1001
-#define CONTROL_CHANGE  0b1011
+#define MIDI_NOTE_OFF	 0b1000
+#define MIDI_NOTE_ON	 0b1001
+#define MIDI_CTRL_CHANGE 0b1011
 
 #define KEY_NONE	255
 
@@ -77,6 +77,10 @@ const TNoteInfo CMiniOrgan::s_Keys[] =
 	{'X', 62}, // D3
 	{'S', 61}, // C#3
 	{'Z', 60}  // C3
+};
+
+const signed CMiniOrgan::m_nIntervals[] = {
+	1,3,4,5,12,(1/2)
 };
 
 CMiniOrgan *CMiniOrgan::s_pThis = 0;
@@ -269,10 +273,10 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 					m_nPhase[voice] = 0;
 				}
 				for(int osc = 0; osc < OSCILLATORS; osc++) {
-						WaveTable table = tables[m_nOscType[osc]];
-						u32 m_nCurrentLevel = (velocity*table.valueAt(sampleIdx*m_nOscMod[osc])) / (VOICES*OSCILLATORS);
-						*leftSample += m_nCurrentLevel;		// 2 stereo channels
-						*rightSample += m_nCurrentLevel;
+					WaveTable table = tables[m_nOscType[osc]];
+					u32 m_nCurrentLevel = (velocity*table.valueAt(sampleIdx*m_nOscMod[osc])) / (VOICES*OSCILLATORS);
+					*leftSample += m_nCurrentLevel;		// 2 stereo channels
+					*rightSample += m_nCurrentLevel;
 				}
 			}
 		}
@@ -283,6 +287,45 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 	//filter.processSamples(pBuffer, nChunkSize);
 	
 	return nResult;
+}
+
+void CMiniOrgan::MidiNoteOn(unsigned frequency, unsigned velocity) {
+	for(int currVoice = 0; currVoice < VOICES; currVoice++) {
+		if(m_nFrequency[currVoice] == 0) {
+			m_nFrequency[currVoice] = frequency;
+			m_nPhase[currVoice] = 0;
+			m_nVelocity[currVoice] = velocity;
+			return;
+		}
+	}
+}
+
+void CMiniOrgan::MidiNoteOff(unsigned frequency) {
+	for(int currVoice = 0; currVoice < VOICES; currVoice++) {
+		if(m_nFrequency[currVoice] == frequency) {
+			m_nFrequency[currVoice] = 0;
+			m_nPhase[currVoice] = 0;
+			m_nVelocity[currVoice] = 0;
+			return;
+		}
+	}
+}
+
+void CMiniOrgan::MidiCtrlChange(unsigned controlNumber, unsigned position) {
+	//TODO - make these not hard wired
+	float turnPercent = ((float)position/128);
+	if(controlNumber == 1) {
+		int tableIdx = (int)(turnPercent*TABLES);
+		m_nOscType[0] = tableIdx;
+	} else if(controlNumber == 2) {
+		int tableIdx = (int)(turnPercent*TABLES);
+		m_nOscType[1] = tableIdx;
+	} else if(controlNumber == 3) {
+		int intervalIdx = turnPercent*6;
+		m_nOscMod[1] = m_nIntervals[intervalIdx];
+	} else if(controlNumber == 4) {
+		velocityTable = VelocityTable((turnPercent*4)-2);
+	}
 }
 
 void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLength)
@@ -300,30 +343,28 @@ void CMiniOrgan::MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLeng
 	u8 ucStatus    = pPacket[0];
 	//u8 ucChannel   = ucStatus & 0x0F;
 	u8 ucType      = ucStatus >> 4;
-	u8 ucKeyNumber = pPacket[1];
-	u8 ucVelocity  = pPacket[2];
-
-	if (ucType == MIDI_NOTE_ON) {
-		if (ucVelocity > 0 && ucKeyNumber < sizeof s_KeyFrequency / sizeof s_KeyFrequency[0]) {
-			for(int currVoice = 0; currVoice < VOICES; currVoice++) {
-				if(s_pThis->m_nFrequency[currVoice] == 0) {
-					s_pThis->m_nFrequency[currVoice] = (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5);
-					s_pThis->m_nPhase[currVoice] = 0;
-					s_pThis->m_nVelocity[currVoice] = ucVelocity;
-					break;
-				}
-			}
+	
+	if(ucType == MIDI_NOTE_ON || ucType == MIDI_NOTE_OFF) {
+		unsigned key = (unsigned) pPacket[1];
+		unsigned velocity = (unsigned) pPacket[2];
+		unsigned frequency = 0;
+		if (key > 0 &&  key < sizeof s_KeyFrequency / sizeof s_KeyFrequency[0]) {
+			frequency = (unsigned) (s_KeyFrequency[key] + 0.5);
+		} else {
+			return;
 		}
-	} else if (ucType == MIDI_NOTE_OFF) {
-		for(int currVoice = 0; currVoice < VOICES; currVoice++) {
-			if(s_pThis->m_nFrequency[currVoice] == (unsigned) (s_KeyFrequency[ucKeyNumber] + 0.5)) {
-				s_pThis->m_nFrequency[currVoice] = 0;
-				s_pThis->m_nPhase[currVoice] = 0;
-				s_pThis->m_nVelocity[currVoice] = 0;
-				break;
-			}
+		if (ucType == MIDI_NOTE_ON) {
+			s_pThis->MidiNoteOn(frequency, velocity);
+		} else if(ucType == MIDI_NOTE_OFF)  {
+			s_pThis->MidiNoteOff(frequency);
 		}
-	}
+		return;
+	} else if(ucType == MIDI_CTRL_CHANGE) {
+		u8 ucCtrlNumber = pPacket[1];
+		u8 ucPosition   = pPacket[2];
+		s_pThis->MidiCtrlChange((unsigned) ucCtrlNumber, (unsigned) ucPosition);
+		return;
+	} 
 }
 
 void CMiniOrgan::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6])

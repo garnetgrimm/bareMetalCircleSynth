@@ -34,6 +34,7 @@
 
 #define VOICES 6
 #define OSCILLATORS 2
+#define	TABLES 3
 
 #include <circle/interrupt.h>
 #include <circle/usb/usbmidi.h>
@@ -52,19 +53,16 @@ class CMiniOrgan : public SOUND_CLASS
 public:
 	CMiniOrgan (CInterruptSystem *pInterrupt);
 	~CMiniOrgan (void);
-
 	boolean Initialize (void);
-
 	void Process (boolean bPlugAndPlayUpdated);
-
 	unsigned GetChunk (u32 *pBuffer, unsigned nChunkSize);
-
 private:
 	static void MIDIPacketHandler (unsigned nCable, u8 *pPacket, unsigned nLength);
-
 	static void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
-
 	static void USBDeviceRemovedHandler (CDevice *pDevice, void *pContext);
+	void MidiCtrlChange(unsigned controlNumber, unsigned position);
+	void MidiNoteOff(unsigned frequency);
+	void MidiNoteOn(unsigned frequency, unsigned velocity);
 
 private:
 	CUSBMIDIDevice     * volatile m_pMIDIDevice;
@@ -85,6 +83,8 @@ private:
 	
 	unsigned m_nOscType[OSCILLATORS];
 	unsigned m_nOscMod[OSCILLATORS];
+	
+	static const signed m_nIntervals[];
 
 	static const float s_KeyFrequency[];
 	static const TNoteInfo s_Keys[];
