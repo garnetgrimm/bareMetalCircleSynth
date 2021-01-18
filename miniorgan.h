@@ -84,7 +84,7 @@ private:
 	unsigned m_nOscType[OSCILLATORS];
 	unsigned m_nOscMod[OSCILLATORS];
 	
-	static const signed m_nIntervals[];
+	static const float m_nIntervals[];
 
 	static const float s_KeyFrequency[];
 	static const TNoteInfo s_Keys[];

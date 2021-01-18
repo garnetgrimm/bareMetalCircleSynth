@@ -79,8 +79,11 @@ const TNoteInfo CMiniOrgan::s_Keys[] =
 	{'Z', 60}  // C3
 };
 
-const signed CMiniOrgan::m_nIntervals[] = {
-	1,3,4,5,12,(1/2)
+//P1, m3, M3, P4, P5, m6, M6, m7, M7, P8
+const float CMiniOrgan::m_nIntervals[] = {
+	1.0f, 6.0f/5.0f, 5.0f/4.0f, 4.0f/3.0f, 
+	3.0f/2.0f, 8.0f/5.0f, 5.0f/3.0f, 16.0f/9.0f, 
+	15.0f/8.0f,2.0f/1.0f
 };
 
 CMiniOrgan *CMiniOrgan::s_pThis = 0;
@@ -268,13 +271,14 @@ unsigned CMiniOrgan::GetChunk (u32 *pBuffer, unsigned nChunkSize)
 				unsigned phase = ++m_nPhase[voice];
 				float currentTime = phase*dt;
 				float velocity = ((float)velocityTable.valueAt(m_nVelocity[voice]))/100;
-				int sampleIdx = (int)((float)TABLE_RESOLUTION*m_nFrequency[voice]*currentTime);
-				if(sampleIdx % TABLE_RESOLUTION == 0) {
+				float voiceSampleIdx = (float)TABLE_RESOLUTION*m_nFrequency[voice]*currentTime;
+				if((int)voiceSampleIdx % TABLE_RESOLUTION == 0) {
 					m_nPhase[voice] = 0;
 				}
 				for(int osc = 0; osc < OSCILLATORS; osc++) {
 					WaveTable table = tables[m_nOscType[osc]];
-					u32 m_nCurrentLevel = (velocity*table.valueAt(sampleIdx*m_nOscMod[osc])) / (VOICES*OSCILLATORS);
+					float oscSampleIdx = voiceSampleIdx*m_nOscMod[osc];
+					u32 m_nCurrentLevel = (int) ((float)velocity*table.valueAt((int) oscSampleIdx)) / VOICES;
 					*leftSample += m_nCurrentLevel;		// 2 stereo channels
 					*rightSample += m_nCurrentLevel;
 				}
@@ -321,7 +325,7 @@ void CMiniOrgan::MidiCtrlChange(unsigned controlNumber, unsigned position) {
 		int tableIdx = (int)(turnPercent*TABLES);
 		m_nOscType[1] = tableIdx;
 	} else if(controlNumber == 3) {
-		int intervalIdx = turnPercent*6;
+		int intervalIdx = turnPercent*(sizeof m_nIntervals / sizeof m_nIntervals[0]);
 		m_nOscMod[1] = m_nIntervals[intervalIdx];
 	} else if(controlNumber == 4) {
 		velocityTable = VelocityTable((turnPercent*4)-2);
